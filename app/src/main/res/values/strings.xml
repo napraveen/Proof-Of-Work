@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">ProofOfWork</string>
+    <string name="accessibility_service_label">ProofOfWork Focus Blocker</string>
+    <string name="accessibility_service_description">Detects when distracting apps like Instagram are launched and verifies whether your daily GitHub and LeetCode proof-of-work has been fulfilled before allowing screen time.</string>
+</resources>
