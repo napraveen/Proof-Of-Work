@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.proofofwork.ui.components.BentoCard
 import com.proofofwork.ui.components.DualRadialProgress
-import com.proofofwork.ui.components.HeatmapGrid
 import com.proofofwork.ui.theme.*
 import com.proofofwork.viewmodel.DashboardViewModel
 
@@ -29,7 +28,7 @@ import com.proofofwork.viewmodel.DashboardViewModel
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: (() -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val prefs = uiState.preferences
@@ -57,12 +56,14 @@ fun DashboardScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(
-                            imageVector = Icons.Outlined.Settings,
-                            contentDescription = "Settings",
-                            tint = TextSecondary
-                        )
+                    if (onNavigateToSettings != null) {
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(
+                                imageVector = Icons.Outlined.Settings,
+                                contentDescription = "Settings",
+                                tint = TextSecondary
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -240,41 +241,7 @@ fun DashboardScreen(
                 }
             }
 
-            // 3. GITHUB CONTRIBUTION HEATMAP & STREAK
-            if (prefs.githubUsername.isNotBlank()) {
-                item {
-                    HeatmapGrid(
-                        title = "GitHub Activity & Streak",
-                        streakDays = uiState.githubStatus.streakDays,
-                        subtitle = if (uiState.githubStatus.isPushedToday) {
-                            "${uiState.githubStatus.commitCount} contribution(s) today • ${uiState.githubStatus.latestRepo}"
-                        } else {
-                            "Push today to maintain your streak"
-                        },
-                        days = uiState.githubStatus.recentContributions,
-                        activeThemeColor = NeonEmerald
-                    )
-                }
-            }
-
-            // 4. LEETCODE CONTRIBUTION HEATMAP & STREAK
-            if (prefs.leetcodeUsername.isNotBlank()) {
-                item {
-                    HeatmapGrid(
-                        title = "LeetCode Activity & Streak",
-                        streakDays = uiState.leetcodeStatus.streakDays,
-                        subtitle = if (uiState.leetcodeStatus.isSolvedToday) {
-                            "Solved '${uiState.leetcodeStatus.problemTitle}' • Total ${uiState.leetcodeStatus.totalSolved}"
-                        } else {
-                            "Total ${uiState.leetcodeStatus.totalSolved} solved • Solve 1 today to top up"
-                        },
-                        days = uiState.leetcodeStatus.recentDays,
-                        activeThemeColor = ElectricAmber
-                    )
-                }
-            }
-
-            // 5. PRIORITY TASKS SECTION
+            // 3. PRIORITY TASKS SECTION
             item {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
