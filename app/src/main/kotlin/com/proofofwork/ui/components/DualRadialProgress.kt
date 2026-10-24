@@ -24,6 +24,7 @@ fun DualRadialProgress(
     isGithubComplete: Boolean,
     isLeetcodeComplete: Boolean,
     remainingMinutes: Int,
+    formattedUsedTime: String = "",
     modifier: Modifier = Modifier
 ) {
     val animatedGithubSweep by animateFloatAsState(
@@ -110,6 +111,15 @@ fun DualRadialProgress(
                 letterSpacing = 2.sp,
                 color = if (remainingMinutes > 0) NeonEmerald else CrimsonAlert
             )
+            if (formattedUsedTime.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "$formattedUsedTime used",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextMuted
+                )
+            }
         }
     }
 }

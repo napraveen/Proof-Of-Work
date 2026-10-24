@@ -33,14 +33,32 @@ data class AppUserPreferences(
                 (if (isLeetcodeSolvedToday) leetcodeRewardMinutes else 0) +
                 earnedFromTasksMinutes
 
+    val totalAllowanceMinutes: Int
+        get() = baseFreeMinutes + totalEarnedMinutes
+
     val totalAllowanceSeconds: Int
-        get() = (baseFreeMinutes + totalEarnedMinutes) * 60
+        get() = totalAllowanceMinutes * 60
 
     val remainingSeconds: Int
         get() = maxOf(0, totalAllowanceSeconds - usedSecondsToday)
 
     val remainingMinutes: Int
         get() = if (remainingSeconds > 0) (remainingSeconds + 59) / 60 else 0
+
+    val usedMinutesToday: Int
+        get() = usedSecondsToday / 60
+
+    val formattedUsedTime: String
+        get() {
+            val mins = usedSecondsToday / 60
+            val secs = usedSecondsToday % 60
+            return when {
+                mins == 0 && secs == 0 -> "0m"
+                mins == 0 -> "${secs}s"
+                secs == 0 -> "${mins}m"
+                else -> "${mins}m ${secs}s"
+            }
+        }
 }
 
 class UserPreferencesRepository(private val context: Context) {

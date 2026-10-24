@@ -94,6 +94,7 @@ class BlockerOverlayActivity : ComponentActivity() {
                     isGithubDone = prefs.isGithubPushedToday,
                     isLeetcodeDone = prefs.isLeetcodeSolvedToday,
                     isChecking = isCheckingNow,
+                    formattedUsedTime = prefs.formattedUsedTime,
                     onQuickVerify = { performQuickVerify() },
                     onOpenLeetCode = {
                         val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://leetcode.com/problemset/all/")).apply {
@@ -145,6 +146,7 @@ private fun LockScreenContent(
     isGithubDone: Boolean,
     isLeetcodeDone: Boolean,
     isChecking: Boolean,
+    formattedUsedTime: String,
     onQuickVerify: () -> Unit,
     onOpenLeetCode: () -> Unit,
     onOpenGitHub: () -> Unit,
@@ -203,7 +205,11 @@ private fun LockScreenContent(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "You ran out of screen time. Complete your proof-of-work to mint more minutes.",
+                text = if (formattedUsedTime.isNotBlank() && formattedUsedTime != "0m") {
+                    "You've used $formattedUsedTime of Instagram today. Complete your proof-of-work to mint more minutes."
+                } else {
+                    "You ran out of screen time. Complete your proof-of-work to mint more minutes."
+                },
                 fontSize = 13.sp,
                 color = TextSecondary,
                 textAlign = TextAlign.Center,

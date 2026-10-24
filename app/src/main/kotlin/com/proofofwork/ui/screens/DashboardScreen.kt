@@ -132,10 +132,45 @@ fun DashboardScreen(
                         DualRadialProgress(
                             isGithubComplete = prefs.isGithubPushedToday,
                             isLeetcodeComplete = prefs.isLeetcodeSolvedToday,
-                            remainingMinutes = prefs.remainingMinutes
+                            remainingMinutes = prefs.remainingMinutes,
+                            formattedUsedTime = prefs.formattedUsedTime
                         )
 
                         Spacer(modifier = Modifier.height(14.dp))
+
+                        // Instagram screen time usage banner
+                        Row(
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0x0DFFFFFF), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = null,
+                                    tint = if (prefs.remainingMinutes > 0) NeonEmerald else CrimsonAlert,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Instagram Used Today",
+                                    fontSize = 12.sp,
+                                    color = TextSecondary,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            Text(
+                                text = "${prefs.formattedUsedTime} / ${prefs.totalAllowanceMinutes}m",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         // Stats breakdown chips
                         Row(

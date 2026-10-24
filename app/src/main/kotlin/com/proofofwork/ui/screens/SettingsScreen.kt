@@ -242,6 +242,44 @@ fun SettingsScreen(
                 )
             }
 
+            // 3. TODAY'S INSTAGRAM USAGE METRICS
+            BentoCard {
+                Text(
+                    text = "TODAY'S INSTAGRAM USAGE",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                    color = TextMuted
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column {
+                        Text("Time Used Today", fontSize = 12.sp, color = TextSecondary)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = prefs.formattedUsedTime,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            color = TextPrimary
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("Remaining Allowance", fontSize = 12.sp, color = TextSecondary)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "${prefs.remainingMinutes}m / ${prefs.totalAllowanceMinutes}m",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Black,
+                            color = if (prefs.remainingMinutes > 0) NeonEmerald else CrimsonAlert
+                        )
+                    }
+                }
+            }
+
             // 3. GITHUB PROFILE CONFIG
             BentoCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
