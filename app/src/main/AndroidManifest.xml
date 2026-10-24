@@ -30,10 +30,9 @@
         <activity
             android:name=".ui.screens.BlockerOverlayActivity"
             android:exported="false"
-            android:theme="@style/Theme.ProofOfWork.Translucent"
+            android:theme="@style/Theme.ProofOfWork"
             android:launchMode="singleInstance"
-            android:excludeFromRecents="true"
-            android:noHistory="true" />
+            android:excludeFromRecents="true" />
 
         <!-- Safe Event-driven Accessibility Service -->
         <service

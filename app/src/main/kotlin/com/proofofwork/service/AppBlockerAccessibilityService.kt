@@ -8,9 +8,6 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.proofofwork.ProofOfWorkApp
 import com.proofofwork.core.data.AppUserPreferences
-import com.proofofwork.core.model.NetworkResult
-import com.proofofwork.core.network.GitHubService
-import com.proofofwork.core.network.LeetCodeService
 import com.proofofwork.ui.screens.BlockerOverlayActivity
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
@@ -25,10 +22,6 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     private var activeBlockedPackage: String? = null
     private var cutoffJob: Job? = null
     private var lastBlockedLaunchTime: Long = 0L
-
-    // Just-in-time verification throttle (avoids rapid re-checking)
-    private var lastAutoCheckTime: Long = 0L
-    private var isCheckingJustInTime: Boolean = false
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -84,20 +77,8 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             // Balance available: start session using timestamp delta (zero polling loop)
             startSessionIfNew(packageName, remainingSeconds)
         } else {
-            // Balance is 0: Check if we can do a Just-In-Time Auto-Verification
-            val canCheckGitHub = !prefs.isGithubPushedToday && prefs.githubUsername.isNotBlank()
-            val canCheckLeetCode = !prefs.isLeetcodeSolvedToday && prefs.leetcodeUsername.isNotBlank()
-
-            val now = SystemClock.elapsedRealtime()
-            val hasCooldownElapsed = (now - lastAutoCheckTime) > (3 * 60 * 1000L) // 3-minute throttle
-
-            if ((canCheckGitHub || canCheckLeetCode) && hasCooldownElapsed && !isCheckingJustInTime) {
-                // Perform Just-In-Time verification in the background
-                runJustInTimeVerification(packageName, prefs)
-            } else {
-                // Either already verified both today, or in throttle cooldown: show lock screen
-                triggerLockOverlay(packageName)
-            }
+            // Balance is 0: Lock immediately! Never leave blocked apps open
+            triggerLockOverlay(packageName)
         }
     }
 
@@ -112,64 +93,8 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             cutoffJob = serviceScope.launch {
                 delay(remainingSeconds * 1000L)
                 withContext(Dispatchers.Main) {
-                    launchBlockerOverlay(packageName)
-                }
-            }
-        }
-    }
-
-    private fun runJustInTimeVerification(packageName: String, prefs: AppUserPreferences) {
-        isCheckingJustInTime = true
-        lastAutoCheckTime = SystemClock.elapsedRealtime()
-
-        serviceScope.launch {
-            try {
-                val repo = ProofOfWorkApp.instance.preferencesRepository
-                var foundWork = false
-
-                // 1. Quick check GitHub
-                if (!prefs.isGithubPushedToday && prefs.githubUsername.isNotBlank()) {
-                    val result = GitHubService.verifyTodayPush(prefs.githubUsername)
-                    if (result is NetworkResult.Success && result.data.isPushedToday) {
-                        repo.updateGithubVerified(true)
-                        foundWork = true
-                    }
-                }
-
-                // 2. Quick check LeetCode
-                if (!prefs.isLeetcodeSolvedToday && prefs.leetcodeUsername.isNotBlank()) {
-                    val result = LeetCodeService.verifyTodaySolve(prefs.leetcodeUsername)
-                    if (result is NetworkResult.Success && result.data.isSolvedToday) {
-                        repo.updateLeetcodeVerified(true)
-                        foundWork = true
-                    }
-                }
-
-                if (foundWork) {
-                    // Proof of work verified! Fetch refreshed preferences and let user in seamlessly
-                    val updatedPrefs = repo.userPreferencesFlow.first()
-                    cachedPreferences = updatedPrefs
-                    val newRemaining = updatedPrefs.remainingSeconds
-
-                    if (newRemaining > 0) {
-                        withContext(Dispatchers.Main) {
-                            startSessionIfNew(packageName, newRemaining)
-                        }
-                        return@launch
-                    }
-                }
-
-                // If no proof-of-work found, lock now
-                withContext(Dispatchers.Main) {
                     triggerLockOverlay(packageName)
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "Just-in-time check failed", e)
-                withContext(Dispatchers.Main) {
-                    triggerLockOverlay(packageName)
-                }
-            } finally {
-                isCheckingJustInTime = false
             }
         }
     }
@@ -177,7 +102,7 @@ class AppBlockerAccessibilityService : AccessibilityService() {
     private fun triggerLockOverlay(packageName: String) {
         finalizeActiveSession()
         val now = SystemClock.elapsedRealtime()
-        if (now - lastBlockedLaunchTime > 1200L) {
+        if (now - lastBlockedLaunchTime > 500L) {
             lastBlockedLaunchTime = now
             launchBlockerOverlay(packageName)
         }
@@ -194,6 +119,10 @@ class AppBlockerAccessibilityService : AccessibilityService() {
             activeBlockedPackage = null
 
             if (secondsSpent > 0) {
+                // Update in-memory cachedPreferences immediately to eliminate race conditions
+                cachedPreferences = cachedPreferences?.let { current ->
+                    current.copy(usedSecondsToday = current.usedSecondsToday + secondsSpent)
+                }
                 serviceScope.launch {
                     try {
                         ProofOfWorkApp.instance.preferencesRepository.addUsedSeconds(secondsSpent)

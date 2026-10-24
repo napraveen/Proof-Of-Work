@@ -40,7 +40,7 @@ data class AppUserPreferences(
         get() = maxOf(0, totalAllowanceSeconds - usedSecondsToday)
 
     val remainingMinutes: Int
-        get() = remainingSeconds / 60
+        get() = if (remainingSeconds > 0) (remainingSeconds + 59) / 60 else 0
 }
 
 class UserPreferencesRepository(private val context: Context) {

@@ -3,7 +3,10 @@ package com.proofofwork.ui.screens
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -17,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -34,6 +38,13 @@ class BlockerOverlayActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Intercept back button at the activity level to prevent bypassing into the blocked app
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                exitToHome()
+            }
+        })
+
         setContent {
             ProofOfWorkTheme {
                 val repo = remember { ProofOfWorkApp.instance.preferencesRepository }
@@ -41,58 +52,91 @@ class BlockerOverlayActivity : ComponentActivity() {
                 val coroutineScope = rememberCoroutineScope()
                 var isCheckingNow by remember { mutableStateOf(false) }
 
+                fun performQuickVerify() {
+                    if (isCheckingNow) return
+                    coroutineScope.launch {
+                        isCheckingNow = true
+                        var verified = false
+
+                        if (!prefs.isGithubPushedToday && prefs.githubUsername.isNotBlank()) {
+                            val result = GitHubService.verifyTodayPush(prefs.githubUsername)
+                            if (result is NetworkResult.Success && result.data.isPushedToday) {
+                                repo.updateGithubVerified(true)
+                                verified = true
+                            }
+                        }
+
+                        if (!prefs.isLeetcodeSolvedToday && prefs.leetcodeUsername.isNotBlank()) {
+                            val result = LeetCodeService.verifyTodaySolve(prefs.leetcodeUsername)
+                            if (result is NetworkResult.Success && result.data.isSolvedToday) {
+                                repo.updateLeetcodeVerified(true)
+                                verified = true
+                            }
+                        }
+
+                        isCheckingNow = false
+                        if (verified) {
+                            finish() // Automatically dismiss lock screen!
+                        }
+                    }
+                }
+
+                // Automatically attempt verification once on overlay launch
+                LaunchedEffect(prefs.githubUsername, prefs.leetcodeUsername) {
+                    val canCheckGitHub = !prefs.isGithubPushedToday && prefs.githubUsername.isNotBlank()
+                    val canCheckLeetCode = !prefs.isLeetcodeSolvedToday && prefs.leetcodeUsername.isNotBlank()
+                    if (canCheckGitHub || canCheckLeetCode) {
+                        performQuickVerify()
+                    }
+                }
+
                 LockScreenContent(
                     isGithubDone = prefs.isGithubPushedToday,
                     isLeetcodeDone = prefs.isLeetcodeSolvedToday,
                     isChecking = isCheckingNow,
-                    onQuickVerify = {
-                        coroutineScope.launch {
-                            isCheckingNow = true
-                            var verified = false
-
-                            if (!prefs.isGithubPushedToday && prefs.githubUsername.isNotBlank()) {
-                                val result = GitHubService.verifyTodayPush(prefs.githubUsername)
-                                if (result is NetworkResult.Success && result.data.isPushedToday) {
-                                    repo.updateGithubVerified(true)
-                                    verified = true
-                                }
-                            }
-
-                            if (!prefs.isLeetcodeSolvedToday && prefs.leetcodeUsername.isNotBlank()) {
-                                val result = LeetCodeService.verifyTodaySolve(prefs.leetcodeUsername)
-                                if (result is NetworkResult.Success && result.data.isSolvedToday) {
-                                    repo.updateLeetcodeVerified(true)
-                                    verified = true
-                                }
-                            }
-
-                            isCheckingNow = false
-                            if (verified) {
-                                finish() // Automatically dismiss lock screen!
-                            }
-                        }
-                    },
+                    onQuickVerify = { performQuickVerify() },
                     onOpenLeetCode = {
-                        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://leetcode.com/problemset/all/"))
+                        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://leetcode.com/problemset/all/")).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
                         startActivity(browserIntent)
                         finish()
                     },
                     onOpenGitHub = {
-                        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com"))
+                        val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com")).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
                         startActivity(browserIntent)
                         finish()
                     },
                     onExitToHome = {
-                        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
-                            addCategory(Intent.CATEGORY_HOME)
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                        }
-                        startActivity(homeIntent)
-                        finish()
+                        exitToHome()
                     }
                 )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            exitToHome()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    private fun exitToHome() {
+        val homeIntent = Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_HOME)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        startActivity(homeIntent)
+        finish()
     }
 }
 
@@ -106,10 +150,23 @@ private fun LockScreenContent(
     onOpenGitHub: () -> Unit,
     onExitToHome: () -> Unit
 ) {
+    // Intercept back gesture in Compose
+    BackHandler {
+        onExitToHome()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xF208090B))
+            .background(Color(0xFF08090B))
+            .pointerInput(Unit) {
+                // Absorb all pointer events so touches never leak through to the background app
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent()
+                    }
+                }
+            }
             .padding(24.dp),
         contentAlignment = Alignment.Center
     ) {
