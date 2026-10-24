@@ -15,20 +15,39 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.proofofwork.core.data.AppUserPreferences
+import com.proofofwork.core.model.ContributionDay
+import com.proofofwork.core.model.GitHubStatus
+import com.proofofwork.core.model.LeetCodeStatus
 import com.proofofwork.ui.components.BentoCard
 import com.proofofwork.ui.components.HeatmapGrid
 import com.proofofwork.ui.theme.*
+import com.proofofwork.viewmodel.DashboardUiState
 import com.proofofwork.viewmodel.DashboardViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StreaksScreen(
     viewModel: DashboardViewModel,
     onNavigateToSettings: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    StreaksContent(
+        uiState = uiState,
+        onVerifyWork = { viewModel.verifyWorkNow() },
+        onNavigateToSettings = onNavigateToSettings
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StreaksContent(
+    uiState: DashboardUiState,
+    onVerifyWork: () -> Unit,
+    onNavigateToSettings: () -> Unit
+) {
     val prefs = uiState.preferences
 
     Scaffold(
@@ -62,7 +81,7 @@ fun StreaksScreen(
                 },
                 actions = {
                     IconButton(
-                        onClick = { viewModel.verifyWorkNow() },
+                        onClick = onVerifyWork,
                         enabled = !uiState.isVerifying
                     ) {
                         if (uiState.isVerifying) {
@@ -247,7 +266,7 @@ fun StreaksScreen(
             // Sync button
             item {
                 Button(
-                    onClick = { viewModel.verifyWorkNow() },
+                    onClick = onVerifyWork,
                     enabled = !uiState.isVerifying,
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -303,5 +322,37 @@ private fun StreakStatColumn(
                 )
             }
         }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF08090B)
+@Composable
+fun StreaksScreenPreview() {
+    ProofOfWorkTheme {
+        StreaksContent(
+            uiState = DashboardUiState(
+                preferences = AppUserPreferences(
+                    githubUsername = "napraveen",
+                    leetcodeUsername = "napraveen"
+                ),
+                githubStatus = GitHubStatus(
+                    streakDays = 7,
+                    isPushedToday = true,
+                    commitCount = 4,
+                    latestRepo = "ProofOfWork",
+                    recentContributions = listOf(
+                        ContributionDay(date = "2026-10-24", level = 3, count = 4),
+                        ContributionDay(date = "2026-10-23", level = 2, count = 2)
+                    )
+                ),
+                leetcodeStatus = LeetCodeStatus(
+                    streakDays = 12,
+                    isSolvedToday = false,
+                    totalSolved = 142
+                )
+            ),
+            onVerifyWork = {},
+            onNavigateToSettings = {}
+        )
     }
 }

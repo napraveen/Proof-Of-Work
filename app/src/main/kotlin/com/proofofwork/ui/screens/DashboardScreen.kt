@@ -17,20 +17,43 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.proofofwork.core.data.AppUserPreferences
+import com.proofofwork.core.data.database.TaskEntity
 import com.proofofwork.ui.components.BentoCard
 import com.proofofwork.ui.components.DualRadialProgress
 import com.proofofwork.ui.theme.*
+import com.proofofwork.viewmodel.DashboardUiState
 import com.proofofwork.viewmodel.DashboardViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
     onNavigateToSettings: (() -> Unit)? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    DashboardContent(
+        uiState = uiState,
+        onVerifyWork = { viewModel.verifyWorkNow() },
+        onAddTask = { viewModel.addTask(it, 15) },
+        onToggleTask = { viewModel.toggleTaskCompletion(it) },
+        onDeleteTask = { viewModel.deleteTask(it) },
+        onNavigateToSettings = onNavigateToSettings
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DashboardContent(
+    uiState: DashboardUiState,
+    onVerifyWork: () -> Unit,
+    onAddTask: (String) -> Unit,
+    onToggleTask: (TaskEntity) -> Unit,
+    onDeleteTask: (TaskEntity) -> Unit,
+    onNavigateToSettings: (() -> Unit)? = null
+) {
     val prefs = uiState.preferences
     var newTaskTitle by remember { mutableStateOf("") }
 
@@ -204,7 +227,7 @@ fun DashboardScreen(
             // 2. VERIFY WORK ACTION BUTTON
             item {
                 Button(
-                    onClick = { viewModel.verifyWorkNow() },
+                    onClick = onVerifyWork,
                     enabled = !uiState.isVerifying,
                     shape = RoundedCornerShape(18.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -289,7 +312,7 @@ fun DashboardScreen(
                         IconButton(
                             onClick = {
                                 if (newTaskTitle.isNotBlank()) {
-                                    viewModel.addTask(newTaskTitle, 15)
+                                    onAddTask(newTaskTitle)
                                     newTaskTitle = ""
                                 }
                             },
@@ -325,7 +348,7 @@ fun DashboardScreen(
                         ) {
                             Checkbox(
                                 checked = task.isCompletedToday,
-                                onCheckedChange = { viewModel.toggleTaskCompletion(task) },
+                                onCheckedChange = { onToggleTask(task) },
                                 colors = CheckboxDefaults.colors(
                                     checkedColor = NeonEmerald,
                                     uncheckedColor = TextMuted,
@@ -347,7 +370,7 @@ fun DashboardScreen(
                                     color = if (task.isCompletedToday) NeonEmerald else ElectricAmber
                                 )
                             }
-                            IconButton(onClick = { viewModel.deleteTask(task) }) {
+                            IconButton(onClick = { onDeleteTask(task) }) {
                                 Icon(Icons.Outlined.Delete, contentDescription = "Delete", tint = TextMuted, modifier = Modifier.size(18.dp))
                             }
                         }
@@ -382,6 +405,32 @@ private fun StatusChip(
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
             color = if (isComplete) activeColor else TextMuted
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF08090B)
+@Composable
+fun DashboardScreenPreview() {
+    ProofOfWorkTheme {
+        DashboardContent(
+            uiState = DashboardUiState(
+                preferences = AppUserPreferences(
+                    baseFreeMinutes = 15,
+                    githubRewardMinutes = 25,
+                    leetcodeRewardMinutes = 35,
+                    isGithubPushedToday = true,
+                    usedSecondsToday = 900
+                ),
+                tasks = listOf(
+                    TaskEntity(id = 1, title = "Review System Design Chapter 4", isCompletedToday = true, rewardMinutes = 15),
+                    TaskEntity(id = 2, title = "Solve 1 LeetCode Medium", isCompletedToday = false, rewardMinutes = 15)
+                )
+            ),
+            onVerifyWork = {},
+            onAddTask = {},
+            onToggleTask = {},
+            onDeleteTask = {}
         )
     }
 }

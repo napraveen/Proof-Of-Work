@@ -18,23 +18,61 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.proofofwork.ProofOfWorkApp
+import com.proofofwork.core.data.AppUserPreferences
 import com.proofofwork.ui.components.BentoCard
 import com.proofofwork.ui.theme.*
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onNavigateBack: (() -> Unit)? = null
 ) {
-    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val repo = ProofOfWorkApp.instance.preferencesRepository
-    val prefs by repo.userPreferencesFlow.collectAsState(initial = com.proofofwork.core.data.AppUserPreferences())
+    val prefs by repo.userPreferencesFlow.collectAsState(initial = AppUserPreferences())
 
+    SettingsContent(
+        prefs = prefs,
+        onSaveRewards = { gh, lc ->
+            coroutineScope.launch {
+                repo.updateGithubRewardMinutes(gh)
+                repo.updateLeetcodeRewardMinutes(lc)
+            }
+        },
+        onSaveBaseFree = { freeMins ->
+            coroutineScope.launch {
+                repo.updateBaseFreeMinutes(freeMins)
+            }
+        },
+        onSaveGithub = { ghUser ->
+            coroutineScope.launch {
+                repo.updateGithubUsername(ghUser)
+            }
+        },
+        onSaveLeetcode = { lcUser ->
+            coroutineScope.launch {
+                repo.updateLeetcodeUsername(lcUser)
+            }
+        },
+        onNavigateBack = onNavigateBack
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsContent(
+    prefs: AppUserPreferences,
+    onSaveRewards: (Int, Int) -> Unit,
+    onSaveBaseFree: (Int) -> Unit,
+    onSaveGithub: (String) -> Unit,
+    onSaveLeetcode: (String) -> Unit,
+    onNavigateBack: (() -> Unit)? = null
+) {
+    val context = LocalContext.current
     var githubInput by remember(prefs.githubUsername) { mutableStateOf(prefs.githubUsername) }
     var leetcodeInput by remember(prefs.leetcodeUsername) { mutableStateOf(prefs.leetcodeUsername) }
 
@@ -174,11 +212,8 @@ fun SettingsScreen(
 
                 Button(
                     onClick = {
-                        coroutineScope.launch {
-                            repo.updateGithubRewardMinutes(githubRewardSlider.toInt())
-                            repo.updateLeetcodeRewardMinutes(leetcodeRewardSlider.toInt())
-                            savedMessage = "Updated rewards: +${githubRewardSlider.toInt()}m for GitHub, +${leetcodeRewardSlider.toInt()}m for LeetCode!"
-                        }
+                        onSaveRewards(githubRewardSlider.toInt(), leetcodeRewardSlider.toInt())
+                        savedMessage = "Updated rewards: +${githubRewardSlider.toInt()}m for GitHub, +${leetcodeRewardSlider.toInt()}m for LeetCode!"
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald, contentColor = Color.Black),
                     shape = RoundedCornerShape(12.dp),
@@ -219,10 +254,8 @@ fun SettingsScreen(
                     )
                     Button(
                         onClick = {
-                            coroutineScope.launch {
-                                repo.updateBaseFreeMinutes(freeMinutesSlider.toInt())
-                                savedMessage = "Daily free allowance set to ${freeMinutesSlider.toInt()}m!"
-                            }
+                            onSaveBaseFree(freeMinutesSlider.toInt())
+                            savedMessage = "Daily free allowance set to ${freeMinutesSlider.toInt()}m!"
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0x22FFFFFF)),
                         shape = RoundedCornerShape(12.dp)
@@ -282,7 +315,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 3. GITHUB PROFILE CONFIG
+            // 4. GITHUB PROFILE CONFIG
             BentoCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Code, contentDescription = null, tint = NeonEmerald)
@@ -312,10 +345,8 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(10.dp))
                 Button(
                     onClick = {
-                        coroutineScope.launch {
-                            repo.updateGithubUsername(githubInput)
-                            savedMessage = "GitHub username saved!"
-                        }
+                        onSaveGithub(githubInput)
+                        savedMessage = "GitHub username saved!"
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = NeonEmerald, contentColor = Color.Black),
                     shape = RoundedCornerShape(12.dp),
@@ -325,7 +356,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 4. LEETCODE PROFILE CONFIG
+            // 5. LEETCODE PROFILE CONFIG
             BentoCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Terminal, contentDescription = null, tint = ElectricAmber)
@@ -355,10 +386,8 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(10.dp))
                 Button(
                     onClick = {
-                        coroutineScope.launch {
-                            repo.updateLeetcodeUsername(leetcodeInput)
-                            savedMessage = "LeetCode username saved!"
-                        }
+                        onSaveLeetcode(leetcodeInput)
+                        savedMessage = "LeetCode username saved!"
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = ElectricAmber, contentColor = Color.Black),
                     shape = RoundedCornerShape(12.dp),
@@ -368,7 +397,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 5. ACCESSIBILITY PERMISSION CARD
+            // 6. ACCESSIBILITY PERMISSION CARD
             BentoCard {
                 Text(
                     text = "ACCESSIBILITY PERMISSION",
@@ -402,5 +431,26 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(30.dp))
         }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF08090B)
+@Composable
+fun SettingsScreenPreview() {
+    ProofOfWorkTheme {
+        SettingsContent(
+            prefs = AppUserPreferences(
+                githubUsername = "napraveen",
+                leetcodeUsername = "napraveen",
+                baseFreeMinutes = 15,
+                githubRewardMinutes = 25,
+                leetcodeRewardMinutes = 35,
+                usedSecondsToday = 900
+            ),
+            onSaveRewards = { _, _ -> },
+            onSaveBaseFree = {},
+            onSaveGithub = {},
+            onSaveLeetcode = {}
+        )
     }
 }
