@@ -8,6 +8,7 @@ data class TaskEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val title: String,
+    val category: String = "DEEP_WORK",
     val rewardMinutes: Int = 15,
     val isCompletedToday: Boolean = false,
     val completedAtTimestamp: Long = 0L,

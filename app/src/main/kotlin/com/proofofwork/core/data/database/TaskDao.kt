@@ -22,4 +22,17 @@ interface TaskDao {
 
     @Query("UPDATE tasks SET isCompletedToday = 0, completedAtTimestamp = 0")
     suspend fun resetDailyTasks()
+
+    // Voice Proof-of-Work Logs
+    @Query("SELECT * FROM voice_logs ORDER BY timestamp DESC")
+    fun getAllVoiceLogsFlow(): Flow<List<VoiceLogEntity>>
+
+    @Query("SELECT * FROM voice_logs WHERE dateString = :dateStr ORDER BY timestamp DESC")
+    suspend fun getVoiceLogsForDate(dateStr: String): List<VoiceLogEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertVoiceLog(log: VoiceLogEntity): Long
+
+    @Delete
+    suspend fun deleteVoiceLog(log: VoiceLogEntity)
 }

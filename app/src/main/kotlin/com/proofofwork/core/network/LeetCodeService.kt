@@ -102,7 +102,6 @@ object LeetCodeService {
                 }
 
                 val userCalendar = matchedUser.optJSONObject("userCalendar")
-                var streak = userCalendar?.optInt("streak", 0) ?: 0
                 val totalActive = userCalendar?.optInt("totalActiveDays", 0) ?: 0
                 val subCalStr = userCalendar?.optString("submissionCalendar", "{}") ?: "{}"
 
@@ -135,10 +134,40 @@ object LeetCodeService {
                     }
                 }
 
-                val todayStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(todayCalendar.time)
+                val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                val todayStr = dateFormat.format(todayCalendar.time)
                 if (isSolvedToday) {
-                    recentDaysMap[todayStr] = ContributionDay(date = todayStr, level = 3, count = 1)
-                    if (streak == 0) streak = 1
+                    recentDaysMap[todayStr] = ContributionDay(
+                        date = todayStr,
+                        level = 3,
+                        count = maxOf(recentDaysMap[todayStr]?.count ?: 0, 1)
+                    )
+                }
+
+                // Calculate true active consecutive daily streak backwards from submission calendar
+                var streak = 0
+                val checkCal = (todayCalendar.clone() as Calendar).apply {
+                    set(Calendar.HOUR_OF_DAY, 12)
+                }
+
+                val isDoneToday = isSolvedToday || (recentDaysMap[todayStr]?.count ?: 0) > 0
+                if (isDoneToday) {
+                    streak++
+                    checkCal.add(Calendar.DAY_OF_YEAR, -1)
+                } else {
+                    // Not solved today yet; check if yesterday was solved to preserve active streak
+                    checkCal.add(Calendar.DAY_OF_YEAR, -1)
+                }
+
+                while (true) {
+                    val dateKey = dateFormat.format(checkCal.time)
+                    val count = recentDaysMap[dateKey]?.count ?: 0
+                    if (count > 0) {
+                        streak++
+                        checkCal.add(Calendar.DAY_OF_YEAR, -1)
+                    } else {
+                        break
+                    }
                 }
 
                 NetworkResult.Success(

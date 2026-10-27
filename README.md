@@ -1,88 +1,74 @@
-# ⚡ ProofOfWork
+# 🎙️⚡ ProofOfWork
 
-**Earn your dopamine. Lock distractions behind verified code.**
+**Speak your Proof of Work. Earn your dopamine. Lock distractions behind verified voice & code.**
 
-A native, ultra-battery-efficient Android productivity app that blocks social media (Instagram, YouTube, etc.) until you earn screen time by **pushing code to GitHub**, **solving LeetCode problems**, and completing **custom daily tasks**.
+A native, zero-battery-drain Android productivity app that blocks social media (Instagram) until you earn screen time by **speaking what you accomplished via Voice Dictation**, **pushing code to GitHub**, **solving LeetCode problems**, and maintaining a **5-Day Weekday Streak for Weekend Freedom**.
 
 [![Android](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
+[![Voice Dictation](https://img.shields.io/badge/Voice%20Engine-Dictation%20%2B%20Wispr%20Flow-A855F7)](https://wisprflow.ai)
+[![Gemini AI](https://img.shields.io/badge/LLM%20Judge-Gemini%202.0%20Flash-00E5FF)](https://ai.google.dev)
 [![Kotlin](https://img.shields.io/badge/Language-Kotlin%202.0-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose%20M3-4285F4?logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
-[![Battery Safe](https://img.shields.io/badge/CPU%20Idle-0.0%25-00F5A0)](#-zero-battery-architecture)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
-## 💡 The Philosophy: "The Screen Time Economy"
+## 💡 The Philosophy: "The Voice-Driven Screen Time Economy"
 
-Traditional website and app blockers fail because they rely on blunt schedules or willpower that you eventually bypass. 
+Traditional app blockers fail because they rely on rigid schedules or manual checklists that feel like a chore to type.
 
-**ProofOfWork** treats screen time like an economy with a **zero baseline balance**:
-* Every morning, your Instagram allowance is locked at **0 minutes**.
-* You **mint** screen time minutes directly into your local wallet by providing verifiable proofs of work.
-* Open Instagram with zero balance? A glassmorphic lock screen covers it until you ship code.
+**ProofOfWork** turns productivity into a **hands-free, voice-first economy**:
+* **Say "Hey Productivity" / Tap the Mic:** Trigger the app via the Quick Settings Tile, Voice Assistant shortcut, or right from the Instagram Lock Screen.
+* **Speak What You Accomplished:** Dictate naturally using Voice Dictation / Wispr Flow (e.g., *"I just spent 45 minutes refactoring the authentication API and wrote 3 unit tests"*).
+* **AI Proof-of-Work Judge:** Our dual-engine verifier (**Google Gemini 2.0 Flash** + **Built-in Semantic AI Engine**) analyzes your wording, filters out filler words and fake claims, categorizes the effort (`CODING`, `STUDY`, `FITNESS`, `DEEP_WORK`), and **mints Instagram minutes** directly into your wallet.
+* **5-Day Weekday Streak → Weekend Freedom Pass:** Complete at least 1 proof of work Monday through Friday to unlock **Unrestricted Saturday & Sunday Access**—with a 1-tap customizable toggle to switch between *Full Weekend Freedom* and *Normal Strict Daily Mode* anytime.
 
 ```mermaid
 flowchart TD
-    A[Push to GitHub] -->|+25 mins| D[(Screen Time Wallet)]
-    B[Solve LeetCode Problem] -->|+35 mins| D
-    C[Complete Priority Tasks] -->|+15 mins| D
+    A["🎙️ Speak What You Did"] --> B{"🤖 AI Proof-of-Work Judge"}
+    B -->|Verified Effort| C["+15m to +45m Minted"]
+    D["💻 Push to GitHub"] -->|+25 mins| E[(Screen Time Wallet)]
+    F["🧠 Solve LeetCode"] -->|+35 mins| E
+    C --> E
     
-    D --> E{User opens Instagram}
-    E -->|Balance > 0| F[Allow Instagram & Deduct Seconds via Hardware Delta]
-    E -->|Balance == 0| G{Just-In-Time Verification}
-    G -->|New Commits Detected| H[Auto-credit Wallet & Enter Seamlessly]
-    G -->|No Work Done Today| I[Glassmorphic Lock Screen Barrier]
+    E --> G{"User Opens Instagram"}
+    G -->|Weekend Freedom Pass Active| H["🎉 Unlimited Sat & Sun Access"]
+    G -->|Balance > 0| I["Allow Instagram & Deduct Exact Seconds"]
+    G -->|Balance == 0| J["🔒 Glassmorphic Lock Screen: 'Speak Proof of Work to Unlock'"]
 ```
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
-### 1. 🔍 Automated Proof-of-Work Verification
-* **GitHub Calendar Scanner (`GitHubService.kt`):**
-  * Direct HTTP inspection of the official GitHub contribution graph.
-  * Captures public commits, private repo commits, pull requests, and branch merges.
-  * Real-time pushed repository and commit message detection.
-  * True streak calculator (`🔥 XD STREAK`).
-* **LeetCode GraphQL Integration (`LeetCodeService.kt`):**
-  * Queries `recentAcSubmissionList` and `userCalendar` via raw `HttpURLConnection`.
-  * Verifies accepted solutions for today.
-* **Daily Priority Tasks:**
-  * Offline SQLite/Room checklist for offline duties (studying, reading, assignments).
-  * Earn custom minutes per task completed.
+### 1. 🎙️ "Hey Productivity" Voice Proof-of-Work
+* **Hands-Free Launchers:**
+  * **Android Quick Settings Tile (`WisprVoiceTileService`):** Swipe down from any screen and tap **"🎤 Voice Proof"** to jump straight into voice logging.
+  * **Digital Assistant / Voice Command Intent:** Responds to `ACTION_VOICE_COMMAND` & `ACTION_ASSIST` plus long-press App Shortcuts.
+  * **Instagram Lock Screen Voice Unlock:** Locked out of Instagram? Tap **"Speak Proof of Work"** right on the barrier, dictate your completed task, and watch the lock screen automatically dismiss as your minutes are minted!
+* **Automated Speech Formatting & Dictation Metrics:**
+  * Automatically strips filler words (*"um"*, *"uh"*, *"like"*), cleans syntax, tracks words spoken, and verifies authentic work.
 
-### 2. ⚡ Just-In-Time Auto-Verification
-* You **never have to open ProofOfWork to press "Verify"**:
-  * Pushed code during the day and opened Instagram at 8:00 PM?
-  * At the microsecond of launch, the Accessibility Service executes a **0.3s background check** against GitHub.
-  * If work was done today, it credits your account on the spot and **never shows the lock screen**!
-* **Smart Throttling:** Throttles re-checks to 3 minutes if no commits were found to prevent battery drain from repeated app tapping.
+### 2. 🤖 Dual-Engine LLM Proof-of-Work Judge
+* **Cloud LLM (Google Gemini 2.0 Flash) + Instant Offline Semantic AI:**
+  * Evaluates spoken transcripts to verify genuine task completion and reject non-productive excuses (*"I did nothing"*, *"Watched Netflix"*).
+  * Extracts concise task summaries, estimates focus duration, computes confidence scores, and delivers personalized coach feedback.
+* **Custom Task → Instagram Minutes Mapping:**
+  * Map specific task categories (`Coding`, `Study`, `Fitness`, `Deep Work`) or individual priority tasks to custom Instagram minute rewards (`+10m`, `+15m`, `+25m`, `+45m`).
 
-### 3. 🔋 Zero-Battery Architecture
-* **Timestamp Delta (`SystemClock.elapsedRealtime()`):**
-  * **Zero Polling Loops:** No `while(true)` loops running in the background.
-  * When you open Instagram: records `startTime`.
-  * When you exit Instagram or switch apps: calculates `elapsed = endTime - startTime`.
-  * **Result:** While you scroll, ProofOfWork executes **zero lines of code** (0% CPU).
-* **True to the Second:** Opening Instagram for 20 seconds saves 20 seconds. Later opening for 40 seconds completes the 1-minute deduction.
-* **No Background Lockouts:** Switching to WhatsApp or Home Screen pauses the timer immediately; background apps in your recent apps tray never drain your balance.
+### 3. 🔥 5-Day Weekday Streak & Customizable Weekend Freedom Mode
+* **Mon–Fri Progress Tracker:** Visual 5-day progress tracker (`MON • TUE • WED • THU • FRI`).
+* **Customizable Weekend Toggle:**
+  * **ON (Weekend Freedom Pass):** Completing all 5 weekdays automatically grants **Unlimited Instagram Access** on Saturday and Sunday.
+  * **OFF (Normal Mode):** Saturday and Sunday behave like normal weekdays requiring daily Proof of Work.
+  * Includes a **`⚡ Test 5/5`** demo button to test the Weekend Freedom transition with a single tap on any day of the week!
 
-### 4. 🎨 Modern 2026 OLED Bento UI
-* **Obsidian OLED Palette:** Deep black (`#08090B`) saving maximum battery on AMOLED displays.
-* **Dual Radial Arc Gauge:**
-  * 🟢 **Neon Emerald Arc:** GitHub Push progress.
-  * 🟡 **Electric Amber Arc:** LeetCode Solve progress.
-  * Center displays available screen time.
-* **Contribution Heatmap Matrix:**
-  * 10-week calendar grid (Mon–Sun) with weekday labels (`M`, `W`, `F`, `S`) and dynamic luminance scaling.
-* **Full Customization:**
-  * Slider to customize reward minutes per GitHub push (5m to 120m).
-  * Slider to customize reward minutes per LeetCode solve (5m to 120m).
-  * Daily free allowance grace period slider (0m to 60m).
+### 4. 😅 "Voice Accountability Confession" & 📋 EOD Voice Standup
+* **5-Minute Guilty Voice Confession:** Need an urgent 5-minute break without working? You must speak out loud why you are pausing focus and promise to return in 5 minutes.
+* **1-Tap EOD Voice Standup Generator:** Compiles all your spoken logs, word counts, and coding verifications into a clean daily standup summary ready to copy into Slack, Notion, or Discord.
 
-### 5. 🛡️ OS & Privacy Respecting
-* **NO Anti-Bypass Traps:** Does NOT intercept system settings or package managers. You can access phone settings or uninstall the app anytime without lockout.
-* **Zero Authentication Required:** Operates strictly on public profile APIs. No personal access tokens or passwords needed.
+### 5. 🔋 Zero-Battery Millisecond Blocker Architecture
+* **Timestamp Delta (`SystemClock.elapsedRealtime()`):** Zero polling loops in the background (0.0% idle CPU).
+* **True to the Second:** Opening Instagram for 20 seconds deducts 20 seconds; switching to another app pauses deduction immediately.
 
 ---
 
@@ -91,44 +77,28 @@ flowchart TD
 | Layer | Technology |
 | :--- | :--- |
 | **Language** | Kotlin 2.0.21 |
-| **UI Framework** | Jetpack Compose (BOM 2024.09.03) + Material Design 3 |
-| **Architecture** | MVVM + Unidirectional Data Flow (StateFlow / Coroutines) |
-| **Local Storage** | Jetpack DataStore (Preferences) + Room Database 2.6.1 |
-| **Networking** | Pure `java.net.HttpURLConnection` (Zero third-party SDK bloat) |
-| **App Interception** | Android `AccessibilityService` (`TYPE_WINDOW_STATE_CHANGED`) |
-| **Min / Target SDK** | Min SDK 26 (Android 8.0) • Target SDK 35 (Android 15) |
+| **Voice & AI** | Voice Dictation (Wispr Flow / SpeechRecognizer) + Google Gemini 2.0 Flash API |
+| **UI Framework** | Jetpack Compose (Material Design 3) • Obsidian OLED Bento UI |
+| **Architecture** | MVVM + Unidirectional Data Flow (`StateFlow` / Coroutines) |
+| **Local Storage** | Jetpack DataStore (Preferences) + Room Database 2.6.1 (`TaskEntity`, `VoiceLogEntity`) |
+| **OS Integration** | `AccessibilityService` + `TileService` (Quick Settings) + App Shortcuts |
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Fast Build & Deploy
 
-### Prerequisites
-* Android device (Android 8.0+)
-* Android SDK 35 / Java 17+ or 22
-
-### Fast Build & Deploy
-Clone the repository and run the fast deployment script:
 ```powershell
-git clone https://github.com/napraveen/ProofOfWork.git
 cd ProofOfWork
 .\run.ps1
 ```
 
-### Manual Build
+Or build manually via Gradle:
 ```bash
 ./gradlew assembleDebug
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-### Setup on Phone
-1. Open **ProofOfWork**.
-2. Tap the **Settings (⚙️)** icon:
-   * Enter your **GitHub** and **LeetCode** handles.
-   * Adjust your reward sliders and daily free allowance.
-   * Tap **Open Accessibility Settings** and toggle on **ProofOfWork Focus Blocker**.
-3. You're all set! Ship code to unlock your scroll time.
-
 ---
 
 ## 📄 License
-This project is open-source and licensed under the [MIT License](LICENSE).
+Open-source under the [MIT License](LICENSE).

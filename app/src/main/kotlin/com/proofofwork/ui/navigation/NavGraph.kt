@@ -46,7 +46,9 @@ sealed class Screen(
 @Composable
 fun NavGraph(
     navController: NavHostController = rememberNavController(),
-    dashboardViewModel: DashboardViewModel = viewModel()
+    dashboardViewModel: DashboardViewModel = viewModel(),
+    autoOpenVoiceModal: Boolean = false,
+    onConsumedAutoOpenVoice: () -> Unit = {}
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
@@ -117,6 +119,8 @@ fun NavGraph(
             composable(Screen.Home.route) {
                 DashboardScreen(
                     viewModel = dashboardViewModel,
+                    autoOpenVoiceModal = autoOpenVoiceModal,
+                    onConsumedAutoOpenVoice = onConsumedAutoOpenVoice,
                     onNavigateToSettings = {
                         navController.navigate(Screen.Settings.route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }

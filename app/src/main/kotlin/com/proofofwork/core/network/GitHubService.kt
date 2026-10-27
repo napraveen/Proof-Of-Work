@@ -103,7 +103,9 @@ object GitHubService {
 
                 // 3. Calculate true consecutive daily streak backwards
                 var streak = 0
-                val checkCal = Calendar.getInstance()
+                val checkCal = Calendar.getInstance().apply {
+                    set(Calendar.HOUR_OF_DAY, 12)
+                }
                 val todayLevel = dayMap[todayStr] ?: 0
 
                 if (todayLevel > 0) {

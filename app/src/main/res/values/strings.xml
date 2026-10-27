@@ -1,5 +1,8 @@
 <resources>
     <string name="app_name">ProofOfWork</string>
     <string name="accessibility_service_label">ProofOfWork Focus Blocker</string>
-    <string name="accessibility_service_description">Detects when distracting apps like Instagram are launched and verifies whether your daily GitHub and LeetCode proof-of-work has been fulfilled before allowing screen time.</string>
+    <string name="accessibility_service_description">Detects when distracting apps like Instagram are launched and verifies whether your daily Voice, GitHub, and LeetCode proof-of-work has been fulfilled before allowing screen time.</string>
+    <string name="shortcut_speak_short">Speak Work</string>
+    <string name="shortcut_speak_long">Hey Productivity (Voice Log)</string>
+    <string name="wispr_tile_label">Voice Proof</string>
 </resources>

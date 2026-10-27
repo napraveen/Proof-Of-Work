@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="speak_proof_of_work"
+        android:enabled="true"
+        android:icon="@android:drawable/ic_btn_speak_now"
+        android:shortcutShortLabel="@string/shortcut_speak_short"
+        android:shortcutLongLabel="@string/shortcut_speak_long">
+        <intent
+            android:action="com.proofofwork.ACTION_SPEAK_PROOF"
+            android:targetPackage="com.proofofwork"
+            android:targetClass="com.proofofwork.MainActivity">
+            <extra
+                android:name="extra_auto_start_voice"
+                android:value="true" />
+        </intent>
+    </shortcut>
+</shortcuts>

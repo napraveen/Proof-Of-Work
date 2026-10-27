@@ -1,20 +1,21 @@
 package com.proofofwork.ui.screens
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,6 +25,8 @@ import com.proofofwork.core.model.GitHubStatus
 import com.proofofwork.core.model.LeetCodeStatus
 import com.proofofwork.ui.components.BentoCard
 import com.proofofwork.ui.components.HeatmapGrid
+import com.proofofwork.ui.components.StreakProgressJourneyCard
+import com.proofofwork.ui.components.WeekdayStreakCard
 import com.proofofwork.ui.theme.*
 import com.proofofwork.viewmodel.DashboardUiState
 import com.proofofwork.viewmodel.DashboardViewModel
@@ -37,6 +40,9 @@ fun StreaksScreen(
     StreaksContent(
         uiState = uiState,
         onVerifyWork = { viewModel.verifyWorkNow() },
+        onToggleWeekendFreedom = { viewModel.toggleWeekendFreedom(it) },
+        onToggleDemo5DayStreak = { viewModel.toggleDemo5DayStreak(it) },
+        onToggleWeekdayIndex = { viewModel.toggleWeekdayIndex(it) },
         onNavigateToSettings = onNavigateToSettings
     )
 }
@@ -46,6 +52,9 @@ fun StreaksScreen(
 fun StreaksContent(
     uiState: DashboardUiState,
     onVerifyWork: () -> Unit,
+    onToggleWeekendFreedom: (Boolean) -> Unit = {},
+    onToggleDemo5DayStreak: (Boolean) -> Unit = {},
+    onToggleWeekdayIndex: (Int) -> Unit = {},
     onNavigateToSettings: () -> Unit
 ) {
     val prefs = uiState.preferences
@@ -58,7 +67,7 @@ fun StreaksContent(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(28.dp)
+                                .size(30.dp)
                                 .background(Color(0x26FFA116), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
@@ -71,10 +80,10 @@ fun StreaksContent(
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "STREAKS & ACTIVITY",
+                            text = "STREAKS & STATS",
                             fontSize = 17.sp,
                             fontWeight = FontWeight.Black,
-                            letterSpacing = 1.5.sp,
+                            letterSpacing = 1.2.sp,
                             color = TextPrimary
                         )
                     }
@@ -110,41 +119,15 @@ fun StreaksContent(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Status & Feedback Messages
-            if (uiState.statusMessage != null) {
-                item {
-                    BentoCard(
-                        containerColor = Color(0xFF14241C),
-                        borderColor = NeonEmerald.copy(alpha = 0.3f)
-                    ) {
-                        Text(
-                            text = uiState.statusMessage ?: "",
-                            color = NeonEmerald,
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
+            // 1. 5-DAY WEEKDAY STREAK PROGRESS JOURNEY
+            item {
+                StreakProgressJourneyCard(
+                    prefs = prefs,
+                    onToggleWeekdayIndex = onToggleWeekdayIndex
+                )
             }
 
-            if (uiState.errorMessage != null) {
-                item {
-                    BentoCard(
-                        containerColor = Color(0xFF2B1218),
-                        borderColor = CrimsonAlert.copy(alpha = 0.3f)
-                    ) {
-                        Text(
-                            text = uiState.errorMessage ?: "",
-                            color = CrimsonAlert,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-
-            // Streak Overview Hero Card
+            // 2. CODING CONSISTENCY HERO CARD (BALANCED 2-COLUMN GRID)
             item {
                 BentoCard {
                     Text(
@@ -154,46 +137,52 @@ fun StreaksContent(
                         letterSpacing = 1.sp,
                         color = TextMuted
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     Row(
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        StreakStatColumn(
-                            title = "GitHub Streak",
-                            days = uiState.githubStatus.streakDays,
-                            activeColor = NeonEmerald,
-                            isDoneToday = uiState.githubStatus.isPushedToday
-                        )
+                        Box(modifier = Modifier.weight(1f)) {
+                            StreakStatColumn(
+                                title = "GitHub Streak",
+                                days = uiState.githubStatus.streakDays,
+                                activeColor = NeonEmerald,
+                                isDoneToday = uiState.githubStatus.isPushedToday
+                            )
+                        }
                         Box(
                             modifier = Modifier
                                 .width(1.dp)
-                                .height(50.dp)
+                                .height(52.dp)
                                 .background(ObsidianCardBorder)
                         )
-                        StreakStatColumn(
-                            title = "LeetCode Streak",
-                            days = uiState.leetcodeStatus.streakDays,
-                            activeColor = ElectricAmber,
-                            isDoneToday = uiState.leetcodeStatus.isSolvedToday
-                        )
+                        Box(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
+                            StreakStatColumn(
+                                title = "LeetCode Streak",
+                                days = uiState.leetcodeStatus.streakDays,
+                                activeColor = ElectricAmber,
+                                isDoneToday = uiState.leetcodeStatus.isSolvedToday
+                            )
+                        }
                     }
                 }
             }
 
-            // 1. GITHUB CONTRIBUTION HEATMAP & STREAK
+            // 4. GITHUB CONTRIBUTION HEATMAP & STREAK
             if (prefs.githubUsername.isNotBlank()) {
                 item {
                     HeatmapGrid(
-                        title = "GitHub Activity & Streak",
+                        title = "GitHub",
                         streakDays = uiState.githubStatus.streakDays,
                         subtitle = if (uiState.githubStatus.isPushedToday) {
-                            "${uiState.githubStatus.commitCount} contribution(s) today • ${uiState.githubStatus.latestRepo}"
+                            "${uiState.githubStatus.commitCount} commit(s) today • ${uiState.githubStatus.latestRepo}"
                         } else {
-                            "Push today to maintain your streak"
+                            "Push today to maintain streak"
                         },
                         days = uiState.githubStatus.recentContributions,
-                        activeThemeColor = NeonEmerald
+                        activeThemeColor = NeonEmerald,
+                        icon = Icons.Default.Code,
+                        username = prefs.githubUsername
                     )
                 }
             } else {
@@ -208,9 +197,10 @@ fun StreaksContent(
                         Text(
                             text = "Add your GitHub username in Settings to track commit heatmaps and earn daily screen time.",
                             fontSize = 12.sp,
-                            color = TextSecondary
+                            color = TextSecondary,
+                            lineHeight = 16.sp
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         OutlinedButton(
                             onClick = onNavigateToSettings,
                             shape = RoundedCornerShape(12.dp),
@@ -222,19 +212,21 @@ fun StreaksContent(
                 }
             }
 
-            // 2. LEETCODE CONTRIBUTION HEATMAP & STREAK
+            // 5. LEETCODE CONTRIBUTION HEATMAP & STREAK
             if (prefs.leetcodeUsername.isNotBlank()) {
                 item {
                     HeatmapGrid(
-                        title = "LeetCode Activity & Streak",
+                        title = "LeetCode",
                         streakDays = uiState.leetcodeStatus.streakDays,
                         subtitle = if (uiState.leetcodeStatus.isSolvedToday) {
-                            "Solved '${uiState.leetcodeStatus.problemTitle}' • Total ${uiState.leetcodeStatus.totalSolved}"
+                            "Solved '${uiState.leetcodeStatus.problemTitle}'"
                         } else {
-                            "Total ${uiState.leetcodeStatus.totalSolved} solved • Solve 1 today to top up"
+                            "Total ${uiState.leetcodeStatus.totalSolved} solved • 0 today"
                         },
                         days = uiState.leetcodeStatus.recentDays,
-                        activeThemeColor = ElectricAmber
+                        activeThemeColor = ElectricAmber,
+                        icon = Icons.Default.Terminal,
+                        username = prefs.leetcodeUsername
                     )
                 }
             } else {
@@ -249,9 +241,10 @@ fun StreaksContent(
                         Text(
                             text = "Add your LeetCode username in Settings to track problem streaks and earn daily minutes.",
                             fontSize = 12.sp,
-                            color = TextSecondary
+                            color = TextSecondary,
+                            lineHeight = 16.sp
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         OutlinedButton(
                             onClick = onNavigateToSettings,
                             shape = RoundedCornerShape(12.dp),
@@ -263,7 +256,7 @@ fun StreaksContent(
                 }
             }
 
-            // Sync button
+            // 6. SYNC BUTTON
             item {
                 Button(
                     onClick = onVerifyWork,
@@ -273,16 +266,18 @@ fun StreaksContent(
                         containerColor = ObsidianCard,
                         contentColor = TextPrimary
                     ),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp)
                 ) {
-                    Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp), tint = NeonEmerald)
+                    Icon(Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(17.dp), tint = NeonEmerald)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Refresh Streaks & Activity", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
 
             item {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(48.dp))
             }
         }
     }
@@ -305,17 +300,17 @@ private fun StreakStatColumn(
                 fontWeight = FontWeight.Black,
                 color = if (days > 0) activeColor else TextPrimary
             )
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Box(
                 modifier = Modifier
                     .background(
                         if (isDoneToday) activeColor.copy(alpha = 0.2f) else Color(0x1AFFFFFF),
                         RoundedCornerShape(8.dp)
                     )
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                    .padding(horizontal = 7.dp, vertical = 3.dp)
             ) {
                 Text(
-                    text = if (isDoneToday) "✓ Done Today" else "Pending",
+                    text = if (isDoneToday) "✓ Done" else "Pending",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (isDoneToday) activeColor else TextMuted
@@ -332,8 +327,10 @@ fun StreaksScreenPreview() {
         StreaksContent(
             uiState = DashboardUiState(
                 preferences = AppUserPreferences(
-                    githubUsername = "napraveen",
-                    leetcodeUsername = "napraveen"
+                    githubUsername = "developer",
+                    leetcodeUsername = "developer",
+                    totalWordsDictated = 245,
+                    totalVoiceLogsCount = 9
                 ),
                 githubStatus = GitHubStatus(
                     streakDays = 7,
@@ -348,7 +345,7 @@ fun StreaksScreenPreview() {
                 leetcodeStatus = LeetCodeStatus(
                     streakDays = 12,
                     isSolvedToday = false,
-                    totalSolved = 142
+                    totalSolved = 140
                 )
             ),
             onVerifyWork = {},

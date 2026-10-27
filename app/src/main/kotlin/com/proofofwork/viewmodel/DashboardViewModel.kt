@@ -5,21 +5,30 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.proofofwork.ProofOfWorkApp
 import com.proofofwork.core.data.AppUserPreferences
+import com.proofofwork.core.data.UserPreferencesRepository
 import com.proofofwork.core.data.database.TaskEntity
+import com.proofofwork.core.data.database.VoiceLogEntity
 import com.proofofwork.core.model.GitHubStatus
 import com.proofofwork.core.model.LeetCodeStatus
 import com.proofofwork.core.model.NetworkResult
+import com.proofofwork.core.network.AiWorkVerifierService
 import com.proofofwork.core.network.GitHubService
 import com.proofofwork.core.network.LeetCodeService
+import com.proofofwork.core.network.VoiceVerificationResult
+import com.proofofwork.core.util.SoundFeedbackHelper
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class DashboardUiState(
     val preferences: AppUserPreferences = AppUserPreferences(),
     val tasks: List<TaskEntity> = emptyList(),
+    val voiceLogs: List<VoiceLogEntity> = emptyList(),
     val githubStatus: GitHubStatus = GitHubStatus(),
     val leetcodeStatus: LeetCodeStatus = LeetCodeStatus(),
     val isVerifying: Boolean = false,
+    val isAnalyzingVoice: Boolean = false,
+    val lastVoiceResult: VoiceVerificationResult? = null,
+    val standupReport: String? = null,
     val statusMessage: String? = null,
     val errorMessage: String? = null
 )
@@ -43,7 +52,8 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
                 // Auto-refresh graph if username was set for the first time
                 if ((prevGh.isEmpty() && prefs.githubUsername.isNotEmpty()) ||
-                    (prevLc.isEmpty() && prefs.leetcodeUsername.isNotEmpty())) {
+                    (prevLc.isEmpty() && prefs.leetcodeUsername.isNotEmpty())
+                ) {
                     verifyWorkNow()
                 }
             }
@@ -55,23 +65,172 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                 _uiState.update { it.copy(tasks = taskList) }
             }
         }
+
+        // Collect Voice Proof-of-Work Logs
+        viewModelScope.launch {
+            taskDao.getAllVoiceLogsFlow().collect { logs ->
+                _uiState.update { it.copy(voiceLogs = logs) }
+            }
+        }
+    }
+
+    fun analyzeVoiceProof(transcript: String, isConfessionMode: Boolean = false) {
+        if (transcript.isBlank() || _uiState.value.isAnalyzingVoice) return
+
+        _uiState.update {
+            it.copy(
+                isAnalyzingVoice = true,
+                lastVoiceResult = null,
+                errorMessage = null
+            )
+        }
+
+        viewModelScope.launch {
+            val prefs = _uiState.value.preferences
+            val pendingTasks = _uiState.value.tasks.filter { !it.isCompletedToday }
+
+            val result = if (isConfessionMode) {
+                AiWorkVerifierService.evaluateConfession(transcript)
+            } else {
+                AiWorkVerifierService.evaluateSpokenWork(transcript, prefs, pendingTasks)
+            }
+
+            if (result.isVerified) {
+                SoundFeedbackHelper.playSuccessChime()
+
+                // Save Voice Log to Room DB
+                val logEntity = VoiceLogEntity(
+                    transcript = result.cleanedTranscript,
+                    summary = result.summary,
+                    category = result.category,
+                    effortMinutes = result.effortMinutes,
+                    rewardMinutes = result.rewardMinutes,
+                    aiFeedback = result.aiFeedback,
+                    confidenceScore = result.confidenceScore,
+                    wordCount = result.wordCount,
+                    isConfession = isConfessionMode,
+                    dateString = UserPreferencesRepository.getTodayDateString()
+                )
+                taskDao.insertVoiceLog(logEntity)
+
+                // If it matched a pending task, mark that task completed too
+                result.matchedTaskId?.let { matchedId ->
+                    _uiState.value.tasks.firstOrNull { it.id == matchedId }?.let { task ->
+                        taskDao.updateTask(
+                            task.copy(
+                                isCompletedToday = true,
+                                completedAtTimestamp = System.currentTimeMillis()
+                            )
+                        )
+                    }
+                }
+
+                // Credit Instagram minutes & word count
+                prefsRepo.addEarnedVoiceMinutes(
+                    minutes = result.rewardMinutes,
+                    wordsSpoken = result.wordCount,
+                    isConfession = isConfessionMode
+                )
+
+                _uiState.update {
+                    it.copy(
+                        isAnalyzingVoice = false,
+                        lastVoiceResult = result,
+                        statusMessage = "🎙️ Verified '${result.summary}'! +${result.rewardMinutes}m added to your Instagram wallet."
+                    )
+                }
+            } else {
+                SoundFeedbackHelper.playErrorTone()
+                _uiState.update {
+                    it.copy(
+                        isAnalyzingVoice = false,
+                        lastVoiceResult = result
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearLastVoiceResult() {
+        _uiState.update { it.copy(lastVoiceResult = null) }
+    }
+
+    fun deleteVoiceLog(log: VoiceLogEntity) {
+        viewModelScope.launch {
+            if (log.rewardMinutes > 0) {
+                prefsRepo.deductEarnedVoiceMinutes(log.rewardMinutes, log.wordCount)
+            }
+            taskDao.deleteVoiceLog(log)
+        }
+    }
+
+    fun generateStandupSummary() {
+        val state = _uiState.value
+        val todayStr = UserPreferencesRepository.getTodayDateString()
+        val todayLogs = state.voiceLogs.filter { it.dateString == todayStr }
+        val completedTasks = state.tasks.filter { it.isCompletedToday }
+        val report = AiWorkVerifierService.generateDailyStandupReport(
+            voiceLogs = todayLogs,
+            completedTasks = completedTasks,
+            prefs = state.preferences
+        )
+        _uiState.update { it.copy(standupReport = report) }
+    }
+
+    fun dismissStandupReport() {
+        _uiState.update { it.copy(standupReport = null) }
+    }
+
+    fun toggleWeekendFreedom(enabled: Boolean) {
+        viewModelScope.launch {
+            prefsRepo.updateWeekendFreedomEnabled(enabled)
+        }
+    }
+
+    fun toggleDemo5DayStreak(simulate: Boolean) {
+        viewModelScope.launch {
+            prefsRepo.updateDemoSimulate5DayStreak(simulate)
+        }
+    }
+
+    fun toggleWeekdayIndex(dayIdx: Int) {
+        viewModelScope.launch {
+            prefsRepo.toggleWeekdayCompleted(dayIdx)
+        }
     }
 
     fun verifyWorkNow() {
-        val currentPrefs = _uiState.value.preferences
-        val ghUser = currentPrefs.githubUsername
-        val lcUser = currentPrefs.leetcodeUsername
+        if (_uiState.value.isVerifying) return
 
-        if (ghUser.isBlank() && lcUser.isBlank()) {
-            _uiState.update {
-                it.copy(errorMessage = "Please enter your GitHub or LeetCode username in Settings first.")
-            }
-            return
+        _uiState.update {
+            it.copy(
+                isVerifying = true,
+                errorMessage = null
+            )
         }
 
-        _uiState.update { it.copy(isVerifying = true, statusMessage = "Checking your streaks & contributions...", errorMessage = null) }
-
         viewModelScope.launch {
+            // Immediately load freshest screen time and preferences directly from DataStore
+            try {
+                val fresh = prefsRepo.userPreferencesFlow.first()
+                _uiState.update { it.copy(preferences = fresh) }
+            } catch (_: Exception) {
+            }
+
+            val currentPrefs = _uiState.value.preferences
+            val ghUser = currentPrefs.githubUsername
+            val lcUser = currentPrefs.leetcodeUsername
+
+            if (ghUser.isBlank() && lcUser.isBlank()) {
+                _uiState.update {
+                    it.copy(
+                        isVerifying = false,
+                        errorMessage = "Tip: Use '🎤 Speak Proof of Work' anytime, or connect GitHub/LeetCode in Settings."
+                    )
+                }
+                return@launch
+            }
+
             val messages = mutableListOf<String>()
 
             // 1. Verify GitHub
@@ -125,12 +284,13 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun addTask(title: String, rewardMinutes: Int = 15) {
+    fun addTask(title: String, rewardMinutes: Int = 15, category: String = "DEEP_WORK") {
         if (title.isBlank()) return
         viewModelScope.launch {
             taskDao.insertTask(
                 TaskEntity(
                     title = title.trim(),
+                    category = category,
                     rewardMinutes = maxOf(5, rewardMinutes)
                 )
             )
@@ -146,6 +306,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             taskDao.updateTask(updated)
 
             if (updated.isCompletedToday) {
+                SoundFeedbackHelper.playSuccessChime()
                 prefsRepo.addEarnedTaskMinutes(task.rewardMinutes)
             } else {
                 prefsRepo.addEarnedTaskMinutes(-task.rewardMinutes)
@@ -155,6 +316,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun deleteTask(task: TaskEntity) {
         viewModelScope.launch {
+            if (task.isCompletedToday && task.rewardMinutes > 0) {
+                prefsRepo.addEarnedTaskMinutes(-task.rewardMinutes)
+            }
             taskDao.deleteTask(task)
         }
     }

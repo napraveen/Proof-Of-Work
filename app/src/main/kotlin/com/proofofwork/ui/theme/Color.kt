@@ -18,6 +18,11 @@ val ElectricAmberGlow = Color(0x33FFA116)
 val CrimsonAlert = Color(0xFFFF3366)
 val CrimsonAlertGlow = Color(0x33FF3366)
 
+val WisprViolet = Color(0xFFA855F7)
+val WisprVioletDark = Color(0xFF7E22CE)
+val WisprVioletGlow = Color(0x33A855F7)
+val CyanPulse = Color(0xFF00E5FF)
+
 val TextPrimary = Color(0xFFF3F4F6)
 val TextSecondary = Color(0xFF9CA3AF)
 val TextMuted = Color(0xFF6B7280)
