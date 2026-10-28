@@ -116,7 +116,7 @@ fun StreakProgressJourneyCard(
             } else if (isAll5Done) {
                 "5/5 weekdays completed! Pass ready for the upcoming weekend."
             } else {
-                "Complete ${5 - completedDays.size} more weekday(s) of proof-of-work to earn full unrestricted weekend access."
+                "Complete both GitHub & LeetCode on ${5 - completedDays.size} more weekday(s) to earn full unrestricted weekend access."
             },
             fontSize = 12.sp,
             color = TextSecondary,

@@ -123,7 +123,7 @@ fun StreaksContent(
             item {
                 StreakProgressJourneyCard(
                     prefs = prefs,
-                    onToggleWeekdayIndex = onToggleWeekdayIndex
+                    onToggleWeekdayIndex = null
                 )
             }
 

@@ -176,6 +176,7 @@ class UserPreferencesRepository(private val context: Context) {
             prefs[PreferencesKeys.COMPLETED_WEEKDAYS] = emptySet()
         }
         prefs[PreferencesKeys.CURRENT_WEEK_KEY] = currentWeek
+        syncTodayWeekdayCompletion(prefs)
         return didResetDay
     }
 
@@ -197,8 +198,21 @@ class UserPreferencesRepository(private val context: Context) {
             val savedWeekKey = preferences[PreferencesKeys.CURRENT_WEEK_KEY] ?: thisWeekKey
             val isNewWeek = savedWeekKey != thisWeekKey
 
+            val ghToday = if (isNewDay) false else (preferences[PreferencesKeys.IS_GITHUB_PUSHED_TODAY] ?: false)
+            val lcToday = if (isNewDay) false else (preferences[PreferencesKeys.IS_LEETCODE_SOLVED_TODAY] ?: false)
+
             val rawWeekdays = if (isNewWeek) emptySet() else (preferences[PreferencesKeys.COMPLETED_WEEKDAYS] ?: emptySet())
-            val parsedWeekdays = rawWeekdays.mapNotNull { it.toIntOrNull() }.filter { it in 1..5 }.toSet()
+            val todayWeekday = getTodayWeekdayIndex()
+            val parsedWeekdays = rawWeekdays.mapNotNull { it.toIntOrNull() }.filter { it in 1..5 }.toMutableSet().apply {
+                // Today's weekday in the 5-day streak is ONLY marked completed when BOTH GitHub and LeetCode are completed today
+                if (todayWeekday in 1..5) {
+                    if (ghToday && lcToday) {
+                        add(todayWeekday)
+                    } else {
+                        remove(todayWeekday)
+                    }
+                }
+            }.toSet()
 
             AppUserPreferences(
                 githubUsername = preferences[PreferencesKeys.GITHUB_USERNAME] ?: "",
@@ -211,8 +225,8 @@ class UserPreferencesRepository(private val context: Context) {
                 studyTaskMinutes = preferences[PreferencesKeys.STUDY_TASK_MINUTES] ?: 15,
                 fitnessTaskMinutes = preferences[PreferencesKeys.FITNESS_TASK_MINUTES] ?: 15,
                 deepWorkTaskMinutes = preferences[PreferencesKeys.DEEP_WORK_TASK_MINUTES] ?: 15,
-                isGithubPushedToday = if (isNewDay) false else (preferences[PreferencesKeys.IS_GITHUB_PUSHED_TODAY] ?: false),
-                isLeetcodeSolvedToday = if (isNewDay) false else (preferences[PreferencesKeys.IS_LEETCODE_SOLVED_TODAY] ?: false),
+                isGithubPushedToday = ghToday,
+                isLeetcodeSolvedToday = lcToday,
                 earnedFromTasksMinutes = if (isNewDay) 0 else (preferences[PreferencesKeys.EARNED_FROM_TASKS_MINUTES] ?: 0),
                 earnedFromVoiceMinutes = if (isNewDay) 0 else (preferences[PreferencesKeys.EARNED_FROM_VOICE_MINUTES] ?: 0),
                 voiceLogsTodayCount = if (isNewDay) 0 else (preferences[PreferencesKeys.VOICE_LOGS_TODAY_COUNT] ?: 0),
@@ -332,7 +346,11 @@ class UserPreferencesRepository(private val context: Context) {
         }
     }
 
-    private fun markTodayWeekdayComplete(prefs: MutablePreferences) {
+    /**
+     * Marks today's weekday (Mon-Fri) as completed ONLY when BOTH GitHub and LeetCode
+     * have been completed today; otherwise ensures today is not marked complete.
+     */
+    private fun syncTodayWeekdayCompletion(prefs: MutablePreferences) {
         val currentWeek = getCurrentWeekKey()
         val savedWeek = prefs[PreferencesKeys.CURRENT_WEEK_KEY] ?: currentWeek
         val set = if (savedWeek == currentWeek) {
@@ -342,7 +360,13 @@ class UserPreferencesRepository(private val context: Context) {
         }
         val todayIndex = getTodayWeekdayIndex()
         if (todayIndex in 1..5) {
-            set.add(todayIndex.toString())
+            val isGithubDone = prefs[PreferencesKeys.IS_GITHUB_PUSHED_TODAY] ?: false
+            val isLeetcodeDone = prefs[PreferencesKeys.IS_LEETCODE_SOLVED_TODAY] ?: false
+            if (isGithubDone && isLeetcodeDone) {
+                set.add(todayIndex.toString())
+            } else {
+                set.remove(todayIndex.toString())
+            }
         }
         prefs[PreferencesKeys.CURRENT_WEEK_KEY] = currentWeek
         prefs[PreferencesKeys.COMPLETED_WEEKDAYS] = set
@@ -352,7 +376,7 @@ class UserPreferencesRepository(private val context: Context) {
         context.dataStore.edit {
             ensureCurrentDayAndWeek(it)
             it[PreferencesKeys.IS_GITHUB_PUSHED_TODAY] = verified
-            if (verified) markTodayWeekdayComplete(it)
+            syncTodayWeekdayCompletion(it)
         }
     }
 
@@ -360,7 +384,7 @@ class UserPreferencesRepository(private val context: Context) {
         context.dataStore.edit {
             ensureCurrentDayAndWeek(it)
             it[PreferencesKeys.IS_LEETCODE_SOLVED_TODAY] = verified
-            if (verified) markTodayWeekdayComplete(it)
+            syncTodayWeekdayCompletion(it)
         }
     }
 
@@ -369,7 +393,6 @@ class UserPreferencesRepository(private val context: Context) {
             ensureCurrentDayAndWeek(it)
             val current = it[PreferencesKeys.EARNED_FROM_TASKS_MINUTES] ?: 0
             it[PreferencesKeys.EARNED_FROM_TASKS_MINUTES] = maxOf(0, current + minutes)
-            if (minutes > 0) markTodayWeekdayComplete(it)
         }
     }
 
@@ -390,8 +413,6 @@ class UserPreferencesRepository(private val context: Context) {
 
             if (isConfession) {
                 it[PreferencesKeys.CONFESSION_USED_TODAY] = true
-            } else if (minutes > 0) {
-                markTodayWeekdayComplete(it)
             }
         }
     }
