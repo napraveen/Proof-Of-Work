@@ -13,8 +13,10 @@ class DailyResetReceiver : BroadcastReceiver() {
         val app = context?.applicationContext as? ProofOfWorkApp ?: return
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                app.preferencesRepository.resetDay()
-                app.database.taskDao().resetDailyTasks()
+                val didReset = app.preferencesRepository.syncDailyResetIfNeeded()
+                if (didReset) {
+                    app.database.taskDao().resetDailyTasks()
+                }
             } catch (_: Exception) {
             }
         }

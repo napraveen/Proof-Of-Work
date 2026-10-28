@@ -8,8 +8,11 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.lifecycleScope
 import com.proofofwork.ui.navigation.NavGraph
 import com.proofofwork.ui.theme.ProofOfWorkTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -26,6 +29,20 @@ class MainActivity : ComponentActivity() {
                     autoOpenVoiceModal = autoOpenVoiceModal,
                     onConsumedAutoOpenVoice = { autoOpenVoiceModal = false }
                 )
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val app = ProofOfWorkApp.instance
+                val didReset = app.preferencesRepository.syncDailyResetIfNeeded()
+                if (didReset) {
+                    app.database.taskDao().resetDailyTasks()
+                }
+            } catch (_: Exception) {
             }
         }
     }

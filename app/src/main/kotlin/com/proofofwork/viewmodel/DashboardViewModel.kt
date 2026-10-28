@@ -39,10 +39,15 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val prefsRepo = app.preferencesRepository
     private val taskDao = app.database.taskDao()
 
-    private val _uiState = MutableStateFlow(DashboardUiState())
+    private val _uiState = MutableStateFlow(
+        DashboardUiState(preferences = prefsRepo.latestPreferences ?: AppUserPreferences())
+    )
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
     init {
+        // Ensure daily rollover reset is persisted immediately on startup
+        refreshScreenTimeNow()
+
         // Collect User Preferences
         viewModelScope.launch {
             prefsRepo.userPreferencesFlow.collect { prefs ->
@@ -199,7 +204,45 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    /**
+     * Instantly syncs local screen time and daily rollover state from memory & DataStore,
+     * never blocked by slow GitHub/LeetCode network calls.
+     */
+    fun refreshScreenTimeNow() {
+        prefsRepo.latestPreferences?.let { latest ->
+            val todayStr = UserPreferencesRepository.getTodayDateString()
+            val normalized = if (latest.lastActiveDate.isNotEmpty() && latest.lastActiveDate != todayStr) {
+                latest.copy(
+                    isGithubPushedToday = false,
+                    isLeetcodeSolvedToday = false,
+                    earnedFromTasksMinutes = 0,
+                    earnedFromVoiceMinutes = 0,
+                    voiceLogsTodayCount = 0,
+                    usedSecondsToday = 0,
+                    confessionUsedToday = false,
+                    lastActiveDate = todayStr
+                )
+            } else {
+                latest
+            }
+            _uiState.update { it.copy(preferences = normalized) }
+        }
+
+        viewModelScope.launch {
+            try {
+                val didReset = prefsRepo.syncDailyResetIfNeeded()
+                if (didReset) {
+                    taskDao.resetDailyTasks()
+                }
+                val fresh = prefsRepo.userPreferencesFlow.first()
+                _uiState.update { it.copy(preferences = fresh) }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     fun verifyWorkNow() {
+        refreshScreenTimeNow()
         if (_uiState.value.isVerifying) return
 
         _uiState.update {
@@ -212,6 +255,10 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             // Immediately load freshest screen time and preferences directly from DataStore
             try {
+                val didReset = prefsRepo.syncDailyResetIfNeeded()
+                if (didReset) {
+                    taskDao.resetDailyTasks()
+                }
                 val fresh = prefsRepo.userPreferencesFlow.first()
                 _uiState.update { it.copy(preferences = fresh) }
             } catch (_: Exception) {

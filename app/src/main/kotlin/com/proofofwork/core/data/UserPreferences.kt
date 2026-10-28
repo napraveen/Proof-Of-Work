@@ -4,9 +4,11 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -111,6 +113,10 @@ data class AppUserPreferences(
 
 class UserPreferencesRepository(private val context: Context) {
 
+    @Volatile
+    var latestPreferences: AppUserPreferences? = null
+        private set
+
     private object PreferencesKeys {
         val GITHUB_USERNAME = stringPreferencesKey("github_username")
         val LEETCODE_USERNAME = stringPreferencesKey("leetcode_username")
@@ -138,6 +144,39 @@ class UserPreferencesRepository(private val context: Context) {
         val CONFESSION_USED_TODAY = booleanPreferencesKey("confession_used_today")
         val IS_SERVICE_ENABLED = booleanPreferencesKey("is_service_enabled")
         val BLOCKED_PACKAGES = stringSetPreferencesKey("blocked_packages")
+        val MORNING_RESET_FIX_V2 = booleanPreferencesKey("morning_reset_fix_v2_2026_10_28")
+    }
+
+    /**
+     * Atomically checks if the calendar day (or week) has rolled over inside a DataStore transaction
+     * and zeroes out all daily counters BEFORE any new write stamps today's LAST_ACTIVE_DATE.
+     */
+    private fun ensureCurrentDayAndWeek(prefs: MutablePreferences): Boolean {
+        val todayStr = getTodayDateString()
+        val savedDate = prefs[PreferencesKeys.LAST_ACTIVE_DATE]
+        val migrationApplied = prefs[PreferencesKeys.MORNING_RESET_FIX_V2] ?: false
+
+        var didResetDay = false
+        if ((savedDate != null && savedDate != todayStr) || !migrationApplied) {
+            prefs[PreferencesKeys.IS_GITHUB_PUSHED_TODAY] = false
+            prefs[PreferencesKeys.IS_LEETCODE_SOLVED_TODAY] = false
+            prefs[PreferencesKeys.EARNED_FROM_TASKS_MINUTES] = 0
+            prefs[PreferencesKeys.EARNED_FROM_VOICE_MINUTES] = 0
+            prefs[PreferencesKeys.VOICE_LOGS_TODAY_COUNT] = 0
+            prefs[PreferencesKeys.USED_SECONDS_TODAY] = 0
+            prefs[PreferencesKeys.CONFESSION_USED_TODAY] = false
+            prefs[PreferencesKeys.MORNING_RESET_FIX_V2] = true
+            didResetDay = true
+        }
+        prefs[PreferencesKeys.LAST_ACTIVE_DATE] = todayStr
+
+        val currentWeek = getCurrentWeekKey()
+        val savedWeek = prefs[PreferencesKeys.CURRENT_WEEK_KEY]
+        if (savedWeek != null && savedWeek != currentWeek) {
+            prefs[PreferencesKeys.COMPLETED_WEEKDAYS] = emptySet()
+        }
+        prefs[PreferencesKeys.CURRENT_WEEK_KEY] = currentWeek
+        return didResetDay
     }
 
     val userPreferencesFlow: Flow<AppUserPreferences> = context.dataStore.data
@@ -151,7 +190,8 @@ class UserPreferencesRepository(private val context: Context) {
         .map { preferences ->
             val todayStr = getTodayDateString()
             val savedDate = preferences[PreferencesKeys.LAST_ACTIVE_DATE] ?: todayStr
-            val isNewDay = savedDate != todayStr
+            val migrationApplied = preferences[PreferencesKeys.MORNING_RESET_FIX_V2] ?: false
+            val isNewDay = (savedDate != todayStr) || !migrationApplied
 
             val thisWeekKey = getCurrentWeekKey()
             val savedWeekKey = preferences[PreferencesKeys.CURRENT_WEEK_KEY] ?: thisWeekKey
@@ -187,35 +227,68 @@ class UserPreferencesRepository(private val context: Context) {
                 confessionUsedToday = if (isNewDay) false else (preferences[PreferencesKeys.CONFESSION_USED_TODAY] ?: false),
                 isServiceEnabled = preferences[PreferencesKeys.IS_SERVICE_ENABLED] ?: true,
                 blockedPackages = preferences[PreferencesKeys.BLOCKED_PACKAGES] ?: setOf("com.instagram.android")
-            )
+            ).also { mapped ->
+                latestPreferences = mapped
+            }
         }
 
+    /**
+     * Persists the daily rollover reset to disk if the calendar day has changed (or migration v2 is pending).
+     * Returns true if a daily reset occurred so callers can also reset daily tasks in Room.
+     */
+    suspend fun syncDailyResetIfNeeded(): Boolean = withContext(NonCancellable) {
+        var didReset = false
+        context.dataStore.edit { prefs ->
+            didReset = ensureCurrentDayAndWeek(prefs)
+        }
+        didReset
+    }
+
     suspend fun updateGithubUsername(username: String) {
-        context.dataStore.edit { it[PreferencesKeys.GITHUB_USERNAME] = username.trim() }
+        context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
+            it[PreferencesKeys.GITHUB_USERNAME] = username.trim()
+        }
     }
 
     suspend fun updateLeetcodeUsername(username: String) {
-        context.dataStore.edit { it[PreferencesKeys.LEETCODE_USERNAME] = username.trim() }
+        context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
+            it[PreferencesKeys.LEETCODE_USERNAME] = username.trim()
+        }
     }
 
     suspend fun updateGeminiApiKey(apiKey: String) {
-        context.dataStore.edit { it[PreferencesKeys.GEMINI_API_KEY] = apiKey.trim() }
+        context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
+            it[PreferencesKeys.GEMINI_API_KEY] = apiKey.trim()
+        }
     }
 
     suspend fun updateBaseFreeMinutes(minutes: Int) {
-        context.dataStore.edit { it[PreferencesKeys.BASE_FREE_MINUTES] = maxOf(0, minutes) }
+        context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
+            it[PreferencesKeys.BASE_FREE_MINUTES] = maxOf(0, minutes)
+        }
     }
 
     suspend fun updateGithubRewardMinutes(minutes: Int) {
-        context.dataStore.edit { it[PreferencesKeys.GITHUB_REWARD_MINUTES] = maxOf(0, minutes) }
+        context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
+            it[PreferencesKeys.GITHUB_REWARD_MINUTES] = maxOf(0, minutes)
+        }
     }
 
     suspend fun updateLeetcodeRewardMinutes(minutes: Int) {
-        context.dataStore.edit { it[PreferencesKeys.LEETCODE_REWARD_MINUTES] = maxOf(0, minutes) }
+        context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
+            it[PreferencesKeys.LEETCODE_REWARD_MINUTES] = maxOf(0, minutes)
+        }
     }
 
     suspend fun updateTaskCategoryRewards(coding: Int, study: Int, fitness: Int, deepWork: Int) {
         context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
             it[PreferencesKeys.CODING_TASK_MINUTES] = maxOf(5, coding)
             it[PreferencesKeys.STUDY_TASK_MINUTES] = maxOf(5, study)
             it[PreferencesKeys.FITNESS_TASK_MINUTES] = maxOf(5, fitness)
@@ -224,16 +297,23 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     suspend fun updateWeekendFreedomEnabled(enabled: Boolean) {
-        context.dataStore.edit { it[PreferencesKeys.WEEKEND_FREEDOM_ENABLED] = enabled }
+        context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
+            it[PreferencesKeys.WEEKEND_FREEDOM_ENABLED] = enabled
+        }
     }
 
     suspend fun updateDemoSimulate5DayStreak(simulate: Boolean) {
-        context.dataStore.edit { it[PreferencesKeys.DEMO_SIMULATE_5DAY_STREAK] = simulate }
+        context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
+            it[PreferencesKeys.DEMO_SIMULATE_5DAY_STREAK] = simulate
+        }
     }
 
     suspend fun toggleWeekdayCompleted(dayIndex: Int) {
         if (dayIndex !in 1..5) return
         context.dataStore.edit { prefs ->
+            ensureCurrentDayAndWeek(prefs)
             val currentWeek = getCurrentWeekKey()
             val savedWeek = prefs[PreferencesKeys.CURRENT_WEEK_KEY] ?: currentWeek
             val currentSet = if (savedWeek == currentWeek) {
@@ -268,33 +348,34 @@ class UserPreferencesRepository(private val context: Context) {
         prefs[PreferencesKeys.COMPLETED_WEEKDAYS] = set
     }
 
-    suspend fun updateGithubVerified(verified: Boolean) {
+    suspend fun updateGithubVerified(verified: Boolean) = withContext(NonCancellable) {
         context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
             it[PreferencesKeys.IS_GITHUB_PUSHED_TODAY] = verified
-            it[PreferencesKeys.LAST_ACTIVE_DATE] = getTodayDateString()
             if (verified) markTodayWeekdayComplete(it)
         }
     }
 
-    suspend fun updateLeetcodeVerified(verified: Boolean) {
+    suspend fun updateLeetcodeVerified(verified: Boolean) = withContext(NonCancellable) {
         context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
             it[PreferencesKeys.IS_LEETCODE_SOLVED_TODAY] = verified
-            it[PreferencesKeys.LAST_ACTIVE_DATE] = getTodayDateString()
             if (verified) markTodayWeekdayComplete(it)
         }
     }
 
-    suspend fun addEarnedTaskMinutes(minutes: Int) {
+    suspend fun addEarnedTaskMinutes(minutes: Int) = withContext(NonCancellable) {
         context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
             val current = it[PreferencesKeys.EARNED_FROM_TASKS_MINUTES] ?: 0
             it[PreferencesKeys.EARNED_FROM_TASKS_MINUTES] = maxOf(0, current + minutes)
-            it[PreferencesKeys.LAST_ACTIVE_DATE] = getTodayDateString()
             if (minutes > 0) markTodayWeekdayComplete(it)
         }
     }
 
-    suspend fun addEarnedVoiceMinutes(minutes: Int, wordsSpoken: Int, isConfession: Boolean = false) {
+    suspend fun addEarnedVoiceMinutes(minutes: Int, wordsSpoken: Int, isConfession: Boolean = false) = withContext(NonCancellable) {
         context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
             val currentVoiceMins = it[PreferencesKeys.EARNED_FROM_VOICE_MINUTES] ?: 0
             it[PreferencesKeys.EARNED_FROM_VOICE_MINUTES] = maxOf(0, currentVoiceMins + minutes)
 
@@ -312,12 +393,12 @@ class UserPreferencesRepository(private val context: Context) {
             } else if (minutes > 0) {
                 markTodayWeekdayComplete(it)
             }
-            it[PreferencesKeys.LAST_ACTIVE_DATE] = getTodayDateString()
         }
     }
 
-    suspend fun deductEarnedVoiceMinutes(minutes: Int, wordsSpoken: Int) {
+    suspend fun deductEarnedVoiceMinutes(minutes: Int, wordsSpoken: Int) = withContext(NonCancellable) {
         context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
             val currentVoiceMins = it[PreferencesKeys.EARNED_FROM_VOICE_MINUTES] ?: 0
             it[PreferencesKeys.EARNED_FROM_VOICE_MINUTES] = maxOf(0, currentVoiceMins - minutes)
 
@@ -332,16 +413,25 @@ class UserPreferencesRepository(private val context: Context) {
         }
     }
 
-    suspend fun addUsedSeconds(seconds: Int) {
-        if (seconds <= 0) return
+    suspend fun addUsedSeconds(seconds: Int) = withContext(NonCancellable) {
+        if (seconds <= 0) return@withContext
+        // Immediately update in-memory snapshot for 0ms UI responsiveness
+        latestPreferences?.let { current ->
+            val todayStr = getTodayDateString()
+            val baseUsed = if (current.lastActiveDate != todayStr) 0 else current.usedSecondsToday
+            latestPreferences = current.copy(
+                usedSecondsToday = baseUsed + seconds,
+                lastActiveDate = todayStr
+            )
+        }
         context.dataStore.edit {
+            ensureCurrentDayAndWeek(it)
             val current = it[PreferencesKeys.USED_SECONDS_TODAY] ?: 0
             it[PreferencesKeys.USED_SECONDS_TODAY] = current + seconds
-            it[PreferencesKeys.LAST_ACTIVE_DATE] = getTodayDateString()
         }
     }
 
-    suspend fun resetDay() {
+    suspend fun resetDay() = withContext(NonCancellable) {
         context.dataStore.edit {
             it[PreferencesKeys.IS_GITHUB_PUSHED_TODAY] = false
             it[PreferencesKeys.IS_LEETCODE_SOLVED_TODAY] = false
@@ -350,6 +440,7 @@ class UserPreferencesRepository(private val context: Context) {
             it[PreferencesKeys.VOICE_LOGS_TODAY_COUNT] = 0
             it[PreferencesKeys.USED_SECONDS_TODAY] = 0
             it[PreferencesKeys.CONFESSION_USED_TODAY] = false
+            it[PreferencesKeys.MORNING_RESET_FIX_V2] = true
             it[PreferencesKeys.LAST_ACTIVE_DATE] = getTodayDateString()
         }
     }

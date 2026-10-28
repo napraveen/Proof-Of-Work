@@ -82,13 +82,31 @@ fun DashboardScreen(
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                viewModel.verifyWorkNow()
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_START ||
+                event == androidx.lifecycle.Lifecycle.Event.ON_RESUME
+            ) {
+                viewModel.refreshScreenTimeNow()
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                    viewModel.verifyWorkNow()
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // Keep screen time display live while Dashboard is visible (catches post-transition flushes within 150ms)
+    LaunchedEffect(Unit) {
+        viewModel.refreshScreenTimeNow()
+        kotlinx.coroutines.delay(150L)
+        viewModel.refreshScreenTimeNow()
+        kotlinx.coroutines.delay(350L)
+        viewModel.refreshScreenTimeNow()
+        while (true) {
+            kotlinx.coroutines.delay(1000L)
+            viewModel.refreshScreenTimeNow()
         }
     }
 
